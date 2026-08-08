@@ -21,6 +21,7 @@
 	import { exportAsHtml as _exportHtml, exportAsPdf as _exportPdf } from './utils/export';
 	import { askToOpenExportedFile } from './utils/openExportedFile.js';
 	import { isHomePath } from './utils/homeTab.js';
+	import { scrollToHeading } from './utils/scrollToHeading.js';
 	import { hasRealFilePath } from './utils/tabFileActions.js';
 	import ZoomOverlay from './components/ZoomOverlay.svelte';
 import { processMarkdownHtml } from './utils/markdown';
@@ -1395,10 +1396,7 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 			(markdownBody?.querySelector(`[name="${CSS.escape(id)}"]`) as HTMLElement | null);
 		if (el && markdownBody) {
 			if (options.pushHistory !== false) pushScrollHistory();
-			const containerRect = markdownBody.getBoundingClientRect();
-			const elRect = el.getBoundingClientRect();
-			const targetScrollTop = elRect.top - containerRect.top + markdownBody.scrollTop - 60;
-			markdownBody.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
+			scrollToHeading(markdownBody, el);
 			return true;
 		}
 		return false;

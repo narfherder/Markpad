@@ -4,6 +4,7 @@
 	import { settings } from '../stores/settings.svelte.js';
 	import { t } from '../utils/i18n.js';
 	import { activeTocIdForLine, sourceLineOf } from '../utils/tocFollow.js';
+	import { scrollToHeading } from '../utils/scrollToHeading.js';
 
 	let { markdownBody, htmlContent, activeLine = null, onBeforeJump, collapsedHeaders, ontoggleFold, oncopyref, oncontext, onjump, onshowTooltip, onhideTooltip } = $props<{
 		markdownBody: HTMLElement | null;
@@ -304,10 +305,7 @@
 			el.classList.add('toc-target-active');
 			activeTargetEl = el;
 
-			const containerRect = markdownBody.getBoundingClientRect();
-			const elRect = el.getBoundingClientRect();
-			const targetScrollTop = elRect.top - containerRect.top + markdownBody.scrollTop - 60;
-			markdownBody.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
+			scrollToHeading(markdownBody, el);
 
 			// release lock after scroll settles
 			if (clickLockTimer) clearTimeout(clickLockTimer);
