@@ -6,6 +6,7 @@
 	import { MARKDOWN_LANGUAGE_ID, shouldLinkifyPastedUrl } from '../utils/pasteContext.js';
 	import { toggleLineMarker, type LineMarkerToolId } from '../utils/editorToolbar.js';
 	import { getTabModel, lineEndingLabel, tabModelUri } from '../utils/tabModels.js';
+	import { cssFontFamily } from '../utils/fontStack.js';
 	import { installVimScrollCommands } from '../utils/vimScrollCommands.js';
 	import {
 		headingLinkContext,
@@ -365,7 +366,7 @@
 			// thing its label names.
 			selectionHighlight: settings.occurrencesHighlight,
 			fontSize: settings.editorFontSize,
-			fontFamily: settings.editorFont,
+			fontFamily: cssFontFamily(settings.editorFont, 'monospace'),
 			wordBasedSuggestions: "off",
 			quickSuggestions: false,
 			// Monaco's Unicode highlighter is built for source code, where a
@@ -1700,7 +1701,7 @@
 					: "off",
 				selectionHighlight: settings.occurrencesHighlight,
 				fontSize: settings.editorFontSize * (zoomLevel / 100),
-				fontFamily: settings.editorFont,
+				fontFamily: cssFontFamily(settings.editorFont, 'monospace'),
 				renderWhitespace: settings.showWhitespace ? "all" : "none",
 			});
 		}

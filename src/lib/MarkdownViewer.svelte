@@ -22,6 +22,7 @@
 	import { askToOpenExportedFile } from './utils/openExportedFile.js';
 	import { isHomePath } from './utils/homeTab.js';
 	import { scrollToHeading } from './utils/scrollToHeading.js';
+	import { cssFontFamily } from './utils/fontStack.js';
 	import { hasRealFilePath } from './utils/tabFileActions.js';
 	import ZoomOverlay from './components/ZoomOverlay.svelte';
 import { processMarkdownHtml } from './utils/markdown';
@@ -3526,7 +3527,7 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 	{#if tabManager.activeTab && !isHomePath(tabManager.activeTab.path) && !showHome}
 			<div
 				class="markdown-container"
-				style="zoom: {isEditing && !isSplit ? 1 : zoomLevel / 100}; --code-font: {settings.codeFont}, monospace; --code-font-size: {settings.codeFontSize}px; --highlight-color: {highlightColorMap[settings.highlightColor] || highlightColorMap.yellow};"
+				style="zoom: {isEditing && !isSplit ? 1 : zoomLevel / 100}; --code-font: {cssFontFamily(settings.codeFont, 'monospace')}; --code-font-size: {settings.codeFontSize}px; --highlight-color: {highlightColorMap[settings.highlightColor] || highlightColorMap.yellow};"
 				onwheel={handleWheel}
 				role="presentation">
 				<div class="layout-container" 
@@ -3621,7 +3622,7 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 										if(e.key === 'Enter' || e.key === ' ') handleLinkClick(e as unknown as MouseEvent);
 									}}
 									tabindex="-1"
-									style="outline: none; font-family: {settings.previewFont}, sans-serif; font-size: {settings.previewFontSize}px; flex: 1; --preview-max-width: {previewContentWidth === null ? '100%' : `${previewContentWidth}px`};">
+									style="outline: none; font-family: {cssFontFamily(settings.previewFont, 'sans-serif')}; font-size: {settings.previewFontSize}px; flex: 1; --preview-max-width: {previewContentWidth === null ? '100%' : `${previewContentWidth}px`};">
 									{#if frontMatterInfo.exists}
 										<details
 											class="frontmatter-panel"
