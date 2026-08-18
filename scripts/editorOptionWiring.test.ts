@@ -13,6 +13,7 @@ import {
 } from 'monaco-editor/esm/vs/editor/common/services/unicodeTextModelHighlighter.js';
 import ts from 'typescript';
 
+import { cssFontFamily } from '../src/lib/utils/fontStack.js';
 import { functionSource, readSource, sliceBetween } from './sourceTree.js';
 
 // Editor.svelte translates the settings store into Monaco options and
@@ -242,11 +243,14 @@ function optionsPassedTo(callee: string, settings: Record<string, unknown> = {})
 		compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
 	}).outputText;
 
-	// The literals close over six locals, stubbed rather than reconstructed.
+	// The literals close over seven locals, stubbed rather than reconstructed.
 	// `documentOptions` is the spread that hands the editor the active tab's
 	// model (or `value`/`language` when there is no tab); an empty object is the
 	// right stub because nothing it can contain is an option this file asserts
 	// on. `zoomLevel` is 100, the neutral factor, for the same reason.
+	// `cssFontFamily` is passed for real rather than stubbed: it is the helper
+	// that turns the chosen family into a quoted CSS value, and a stub would
+	// hide whether the option still carries one.
 	return new Function(
 		'settings',
 		'value',
@@ -254,8 +258,9 @@ function optionsPassedTo(callee: string, settings: Record<string, unknown> = {})
 		'getTheme',
 		'documentOptions',
 		'zoomLevel',
+		'cssFontFamily',
 		`return ${js};`,
-	)(settings, '', 'markdown', () => 'app-theme-dark', {}, 100) as Record<string, unknown>;
+	)(settings, '', 'markdown', () => 'app-theme-dark', {}, 100, cssFontFamily) as Record<string, unknown>;
 }
 
 /** The options object Editor.svelte hands to `monaco.editor.create`, evaluated. */
