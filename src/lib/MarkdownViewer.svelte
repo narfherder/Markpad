@@ -1178,10 +1178,26 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 	 */
 	let pendingReloadAnchor: number | null = null;
 
-	/** Every reload path calls this before the load replaces the preview. */
+	/**
+	 * Every reload path calls this before the load replaces the preview.
+	 *
+	 * The condition is the app's own test for "the preview is on screen"
+	 * (`isEditing && !isSplit`), not `!isEditing`. In split view BOTH are true,
+	 * so a guard on `isEditing` alone captured nothing for the one reader most
+	 * likely to be watching a file reload under them: the person writing it in
+	 * the pane next door.
+	 *
+	 * Falls back to the line the scroll handler last recorded. `getPreviewScrollAnchor`
+	 * answers null for a preview scrolled above its first measurable block, and
+	 * the tab has been carrying the same measurement all along.
+	 */
 	function captureReloadAnchor() {
+		if (!markdownBody || (isEditing && !isSplit)) {
+			pendingReloadAnchor = null;
+			return;
+		}
 		pendingReloadAnchor =
-			markdownBody && !isEditing ? getPreviewScrollAnchor(markdownBody) : null;
+			getPreviewScrollAnchor(markdownBody) ?? (tabManager.activeTab?.anchorLine || null);
 	}
 
 	$effect(() => {
