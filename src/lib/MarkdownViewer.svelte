@@ -1201,16 +1201,24 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 	}
 
 	$effect(() => {
-		// The rendered HTML, which a reload replaces wholesale. Deliberately NOT
-		// a dependency on the tab or on the file — neither changes across a
-		// reload, and a dependency on either would leave this unreachable. The
-		// pending anchor is what narrows it to reloads: an ordinary keystroke
-		// re-renders too, and must not move the reader.
+		// Two dependencies, and the second one is the whole point.
+		//
+		// The rendered HTML, because a reload replaces it wholesale. Deliberately
+		// NOT the tab or the file — neither changes across a reload, and either
+		// would leave this unreachable. The pending anchor narrows it to reloads:
+		// an ordinary keystroke re-renders too, and must not move the reader.
+		//
+		// And `isTruncated`, because a large file arrives in TWO passes: the
+		// leading 50KB first, then the whole document once an idle callback gets
+		// a turn. Answering from the first pass and then forgetting the anchor is
+		// what pinned a reader beyond that slice to the last chapter inside it —
+		// the container was only as tall as the part that had arrived, and the
+		// scroll had nowhere further to go.
 		void sanitizedHtml;
+		const truncated = tabManager.activeTab?.isTruncated === true;
 
 		const line = pendingReloadAnchor;
 		if (line === null || line <= 0) return;
-		pendingReloadAnchor = null;
 
 		const body = markdownBody;
 		if (!body) return;
@@ -1218,15 +1226,19 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 		// After the replacement is in the DOM, not before it.
 		tick().then(() => {
 			const match = findAnchorElement(body, line);
-			if (!match) return;
-			const box = measurePreviewBox(match.element);
-			body.scrollTop = getAnchorScrollTop(
-				box.top,
-				box.height,
-				match,
-				line,
-				PREVIEW_ANCHOR_OFFSET,
-			);
+			if (match) {
+				const box = measurePreviewBox(match.element);
+				body.scrollTop = getAnchorScrollTop(
+					box.top,
+					box.height,
+					match,
+					line,
+					PREVIEW_ANCHOR_OFFSET,
+				);
+			}
+			// A leading slice need not contain the line at all. Hold the anchor
+			// until the document is whole, and answer again when it is.
+			if (!truncated) pendingReloadAnchor = null;
 		});
 	});
 
