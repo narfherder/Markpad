@@ -1161,6 +1161,59 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 		}
 	});
 
+	/**
+	 * The source line the reader was on when a RELOAD of the document they are
+	 * already reading began.
+	 *
+	 * The restore above answers tab activation and document change. A reload is
+	 * neither: same tab, same file. But `bind:innerHTML` rebuilds the preview
+	 * from nothing, and a scroll container whose content is replaced does not
+	 * keep the offset the reader had — so a document that reloaded under them
+	 * lost their place. Watching the file is the whole point of live mode, so
+	 * this happened on every write anything else made.
+	 *
+	 * A source line rather than a pixel offset, because the document coming
+	 * back is not the one that left: text inserted above the reader moves their
+	 * place further down the page, and only a line survives that.
+	 */
+	let pendingReloadAnchor: number | null = null;
+
+	/** Every reload path calls this before the load replaces the preview. */
+	function captureReloadAnchor() {
+		pendingReloadAnchor =
+			markdownBody && !isEditing ? getPreviewScrollAnchor(markdownBody) : null;
+	}
+
+	$effect(() => {
+		// The rendered HTML, which a reload replaces wholesale. Deliberately NOT
+		// a dependency on the tab or on the file — neither changes across a
+		// reload, and a dependency on either would leave this unreachable. The
+		// pending anchor is what narrows it to reloads: an ordinary keystroke
+		// re-renders too, and must not move the reader.
+		void sanitizedHtml;
+
+		const line = pendingReloadAnchor;
+		if (line === null || line <= 0) return;
+		pendingReloadAnchor = null;
+
+		const body = markdownBody;
+		if (!body) return;
+
+		// After the replacement is in the DOM, not before it.
+		tick().then(() => {
+			const match = findAnchorElement(body, line);
+			if (!match) return;
+			const box = measurePreviewBox(match.element);
+			body.scrollTop = getAnchorScrollTop(
+				box.top,
+				box.height,
+				match,
+				line,
+				PREVIEW_ANCHOR_OFFSET,
+			);
+		});
+	});
+
 	$effect(() => {
 		if (markdownBody && !isEditing && tabManager.activeTabId) {
 			tick().then(() => {
@@ -1894,6 +1947,7 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 	async function resolveExternalChangeByReloading() {
 		const tab = tabManager.activeTab;
 		if (!tab?.path) return;
+		captureReloadAnchor();
 		clearExternalChangeConflict(tab.id);
 		await loadMarkdown(tab.path, {
 			preserveEditState: true,
@@ -2188,6 +2242,7 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 		if (!activeId || !tab?.path) return;
 		if (!(await canCloseTab(activeId))) return;
 
+		captureReloadAnchor();
 		await loadMarkdown(tab.path, {
 			preserveEditState: true,
 			skipTabManagement: true,
@@ -3112,6 +3167,7 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 						noteExternalChangeConflict(outcome.tabId);
 						return;
 					}
+					captureReloadAnchor();
 					loadMarkdown(outcome.path);
 				}),
 			);
