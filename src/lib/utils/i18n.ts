@@ -134,6 +134,7 @@ export const translations: Record<LanguageCode, Translation> = {
             themeDefault: 'Default',
             themeDefaultLight: 'Default Light',
             themeDefaultDark: 'Default Dark',
+            themeReading: 'Reading',
             themeFollowSystem: 'Follow System'
         },
         colors: {
@@ -388,7 +389,8 @@ export const translations: Record<LanguageCode, Translation> = {
         theme: {
             followSystem: 'Follow System',
             defaultLight: 'Default Light',
-            defaultDark: 'Default Dark'
+            defaultDark: 'Default Dark',
+            reading: 'Reading'
         },
         tabs: {
             untitled: 'Untitled',

@@ -23,6 +23,7 @@
 	import { isHomePath } from './utils/homeTab.js';
 	import { scrollToHeading } from './utils/scrollToHeading.js';
 	import { cssFontFamily } from './utils/fontStack.js';
+	import { isBuiltInTheme, isDarkBuiltInTheme } from './utils/builtinThemes.js';
 	import { hasRealFilePath } from './utils/tabFileActions.js';
 	import ZoomOverlay from './components/ZoomOverlay.svelte';
 import { processMarkdownHtml } from './utils/markdown';
@@ -369,20 +370,24 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 		localStorage.setItem('theme', theme);
 		invoke('save_theme', { theme }).catch(console.error);
 
-		if (theme === 'system' || theme === 'light' || theme === 'dark') {
+		if (isBuiltInTheme(theme)) {
 			if (theme === 'system') {
 				delete document.documentElement.dataset.theme;
 				delete document.documentElement.dataset.themeType;
 			} else {
 				document.documentElement.dataset.theme = theme;
-				document.documentElement.dataset.themeType = theme;
+				// The palette's NAME and the END OF THE RANGE it sits at are two
+				// different facts, and only the second one is what Monaco, Mermaid
+				// and the title bar's icon go on to read. They were the same string
+				// while every dark theme was called `dark`.
+				document.documentElement.dataset.themeType = isDarkBuiltInTheme(theme) ? 'dark' : 'light';
 			}
 			clearVscodeTheme();
 			const monaco = (window as any).monaco;
 			if (monaco && monaco.editor) {
 				const isSystemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 				const effectiveTheme = theme === 'system' ? (isSystemDark ? 'dark' : 'light') : theme;
-				monaco.editor.setTheme(effectiveTheme === 'dark' ? 'vs-dark' : 'vs');
+				monaco.editor.setTheme(isDarkBuiltInTheme(effectiveTheme) ? 'vs-dark' : 'vs');
 			}
 		} else if (theme.startsWith('vscode:')) {
 			const name = theme.replace('vscode:', '');

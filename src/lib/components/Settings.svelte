@@ -1247,6 +1247,7 @@
 									<option value="system">{t('settings.themeFollowSystem', settings.language)}</option>
 									<option value="light">{t('settings.themeDefaultLight', settings.language)}</option>
 									<option value="dark">{t('settings.themeDefaultDark', settings.language)}</option>
+									<option value="reading">{t('settings.themeReading', settings.language)}</option>
 									{#if savedVscodeThemes.length > 0}
 										<optgroup label={t('settings.vsCodeThemes', settings.language)}>
 											{#each savedVscodeThemes as themeOption}

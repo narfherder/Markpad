@@ -9,6 +9,7 @@
 	import { tabManager } from '../stores/tabs.svelte.js';
 	import { settings } from '../stores/settings.svelte.js';
 	import { t } from '../utils/i18n.js';
+	import { isDarkBuiltInTheme } from '../utils/builtinThemes.js';
 	import { getConfiguredTitlebarToolbarIds } from '../utils/titlebarToolbar.js';
 	import { shortcutLabel } from '../utils/shortcuts.js';
 	import { hasRealFilePath } from '../utils/tabFileActions.js';
@@ -462,7 +463,7 @@
 					src={iconUrl}
 					alt="icon"
 					class="window-icon"
-					style:filter={theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'none' : 'invert(0.7)'} />
+					style:filter={isDarkBuiltInTheme(theme) || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'none' : 'invert(0.7)'} />
 			</button>
 			{#if homeMenuOpen}
 				<div
@@ -1009,7 +1010,7 @@
 										x2="5.64"
 										y2="18.36"></line
 									><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
-							{:else if theme === 'dark'}
+							{:else if isDarkBuiltInTheme(theme)}
 								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
 									><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
 							{:else}
@@ -1031,6 +1032,7 @@
 								<button class="theme-option {theme === 'system' ? 'selected' : ''}" onclick={() => handleSetTheme('system')}> {t('theme.followSystem', currentLanguage)} </button>
 								<button class="theme-option {theme === 'light' ? 'selected' : ''}" onclick={() => handleSetTheme('light')}> {t('theme.defaultLight', currentLanguage)} </button>
 								<button class="theme-option {theme === 'dark' ? 'selected' : ''}" onclick={() => handleSetTheme('dark')}> {t('theme.defaultDark', currentLanguage)} </button>
+								<button class="theme-option {theme === 'reading' ? 'selected' : ''}" onclick={() => handleSetTheme('reading')}> {t('theme.reading', currentLanguage)} </button>
 								{#if savedVscodeThemes.length > 0}
 									<div class="theme-menu-divider"></div>
 									{#each savedVscodeThemes as t}

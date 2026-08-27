@@ -170,6 +170,44 @@ body {
 	--hljs-type: #ff7b72;
 }
 
+:root[data-theme="reading"] {
+	/* A warm dark ground for long-form reading: lower contrast than the
+	   default dark theme, which is tuned for code rather than for prose held
+	   on screen for an hour. */
+	--color-fg-default: #ffffff;
+	--color-fg-muted: #e8e8e8;
+	--color-fg-subtle: #9a978f;
+	--color-canvas-default: #383835;
+	--color-canvas-subtle: #ffffff0d;
+	--color-border-default: #5a5a55;
+	--color-border-muted: #4a4a45;
+	--color-neutral-muted: rgba(255, 255, 255, 0.06);
+	--color-accent-fg: #dddddd;
+	--color-accent-emphasis: #ffffff;
+	--color-success-fg: #a8c090;
+	--color-success-emphasis: #8aa673;
+	--color-attention-fg: #d9c089;
+	--color-attention-emphasis: #b89f68;
+	--color-attention-subtle: rgba(217, 192, 137, 0.15);
+	--color-danger-fg: #d98a7b;
+	--color-danger-emphasis: #c06e5f;
+	--color-done-fg: #c0a0c8;
+	--color-done-emphasis: #a382ab;
+	--color-window-border-top: #4a4a45;
+	--color-canvas-overlay: #302f2d;
+	--tab-active-bg: #302f2d;
+
+	/* Syntax highlighting, warmed to the same ground rather than borrowed
+	   from the blue-cast dark theme, where it reads as a foreign object. */
+	--hljs-bg: #302f2d;
+	--hljs-comment: #9a978f;
+	--hljs-keyword: #d9c089;
+	--hljs-string: #a8c090;
+	--hljs-title: #c0a0c8;
+	--hljs-variable: #e8e8e8;
+	--hljs-type: #96bfb4;
+}
+
 body {
 	transition: background-color 0.3s ease, color 0.3s ease;
 }

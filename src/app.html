@@ -11,11 +11,18 @@
           theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
         }
 
-        if (stored === 'dark' || stored === 'light') {
+        // The grounds this can paint before the bundle exists. Keep in step
+        // with BUILT_IN_THEMES in src/lib/utils/builtinThemes.ts and the
+        // :root[data-theme=...] blocks in src/styles.css: this script runs too
+        // early to import either, and a theme missing here paints the wrong
+        // colour behind the window on every launch until the app takes over.
+        var GROUNDS = { dark: '#181818', light: '#FDFDFD', reading: '#383835' };
+
+        if (GROUNDS[stored]) {
           document.documentElement.setAttribute('data-theme', stored);
         }
 
-        var bg = theme === 'dark' ? '#181818' : '#FDFDFD';
+        var bg = GROUNDS[theme] || GROUNDS.light;
         document.documentElement.style.backgroundColor = bg;
       } catch (e) {
         console.error(e);
