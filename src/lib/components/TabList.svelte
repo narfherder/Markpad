@@ -3,6 +3,7 @@
 	import Tab from './Tab.svelte';
 	import ContextMenu, { type ContextMenuItem } from './ContextMenu.svelte';
 	import { t } from '../utils/i18n.js';
+	import { WHEEL_GESTURE_IDLE_MS, nextWheelScrollTarget } from '../utils/wheelScroll.js';
 	import { settings } from '../stores/settings.svelte.js';
 	import { emitTo } from '@tauri-apps/api/event';
 	import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -27,6 +28,31 @@
 	let scrollContainer = $state<HTMLElement | null>(null);
 	let showLeftArrow = $state(false);
 	let showRightArrow = $state(false);
+
+	// Where the current wheel gesture is taking the strip. Notches accumulate
+	// onto this rather than onto `scrollLeft`, which under a smooth scroll lags
+	// the target and would swallow most of a quick flick — see
+	// `nextWheelScrollTarget`. Cleared once the wheel has been idle, so the next
+	// gesture starts from where the strip really is, whatever moved it since.
+	let wheelTarget: number | null = null;
+	let wheelIdleTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function handleTabWheel(e: WheelEvent & { currentTarget: HTMLElement }) {
+		if (e.deltaY === 0) return;
+		e.preventDefault();
+		const el = e.currentTarget;
+		wheelTarget = nextWheelScrollTarget({
+			current: el.scrollLeft,
+			pending: wheelTarget,
+			delta: e.deltaY,
+			deltaMode: e.deltaMode,
+			pageSize: el.clientWidth,
+			max: el.scrollWidth - el.clientWidth,
+		});
+		el.scrollTo({ left: wheelTarget, behavior: 'smooth' });
+		if (wheelIdleTimer) clearTimeout(wheelIdleTimer);
+		wheelIdleTimer = setTimeout(() => (wheelTarget = null), WHEEL_GESTURE_IDLE_MS);
+	}
 
 	// Drag state
 	let draggingId = $state<string | null>(null);
@@ -186,12 +212,7 @@
 			role="tablist"
 			tabindex="-1"
 			oncontextmenu={handleContainerContextMenu}
-			onwheel={(e) => {
-				if (e.deltaY !== 0) {
-					e.preventDefault();
-					e.currentTarget.scrollLeft += e.deltaY;
-				}
-			}}>
+			onwheel={handleTabWheel}>
 			{#each tabManager.tabs as tab, i (tab.id)}
 				<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 				<div
@@ -285,7 +306,6 @@
 		gap: 4px;
 		height: 100%;
 		padding-left: 10px;
-		scroll-behavior: smooth;
 
 		scrollbar-width: none;
 		-ms-overflow-style: none;
