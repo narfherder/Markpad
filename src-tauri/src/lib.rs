@@ -2881,10 +2881,21 @@ pub fn run() {
 
     #[cfg(target_os = "windows")]
     {
-        std::env::set_var(
-            "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
-            "--enable-features=SmoothScrolling",
-        );
+        // Appended, not assigned. This variable is the only way to hand the
+        // webview a Chromium flag, and overwriting it took that away from
+        // whoever launched the app: no --remote-debugging-port to attach to a
+        // window that has stopped answering, and no --disable-features to rule
+        // a feature out of a bug. The caller's arguments go last, where a flag
+        // that contradicts one of ours wins.
+        let mut args = String::from("--enable-features=SmoothScrolling");
+        if let Ok(passed) = std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS") {
+            let passed = passed.trim();
+            if !passed.is_empty() {
+                args.push(' ');
+                args.push_str(passed);
+            }
+        }
+        std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", args);
     }
 
     tauri::Builder::default()
