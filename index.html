@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#383835">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Reader">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="style.css">
+<title>Markpad Reader</title>
+</head>
+<body data-view="library" class="booting">
+
+<header id="bar">
+  <button class="icon-btn" id="btn-lib" aria-label="Library">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+  </button>
+  <div id="title-wrap"><span id="live-dot" hidden></span><span id="title"></span></div>
+  <button class="icon-btn" id="btn-aa" aria-label="Text size">Aa</button>
+  <button class="icon-btn" id="btn-toc" aria-label="Contents">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h12M9 12h12M9 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>
+  </button>
+</header>
+
+<section id="library">
+  <h1 class="lib-title">Library</h1>
+  <div class="lib-actions">
+    <button class="btn" id="btn-files">Open from Files</button>
+    <button class="btn" id="btn-drive">Google Drive</button>
+  </div>
+  <ul id="lib-list"></ul>
+  <p id="lib-empty" hidden>No stories yet. Open one from Files, or from Google Drive for live updates.</p>
+  <div class="lib-foot">
+    <span id="font-status"></span>
+    <button class="link" id="btn-fonts">Load fonts…</button>
+  </div>
+</section>
+
+<article id="doc"></article>
+
+<div id="scrim" hidden></div>
+<nav id="toc" aria-label="Contents">
+  <h2>Contents</h2>
+  <ul id="toc-list"></ul>
+</nav>
+
+<div id="aa-pop" hidden>
+  <button id="fs-down" aria-label="Smaller text">A−</button>
+  <span id="fs-val"></span>
+  <button id="fs-up" aria-label="Larger text">A+</button>
+</div>
+
+<section id="drive-sheet" hidden>
+  <div id="drive-head">
+    <button class="icon-btn" id="drive-back" aria-label="Up a folder">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <span id="drive-path"></span>
+    <button class="pill" id="drive-close">Close</button>
+  </div>
+  <ul id="drive-list"></ul>
+</section>
+
+<div id="banner" hidden><span id="banner-text"></span><button id="banner-btn"></button></div>
+<div id="toast" role="status"></div>
+
+<input type="file" id="file-input" class="vh" tabindex="-1">
+<input type="file" id="font-input" class="vh" tabindex="-1" multiple>
+
+<script src="config.js"></script>
+<script src="marked.umd.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

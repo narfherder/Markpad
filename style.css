@@ -1,0 +1,205 @@
+/* The Reading theme from the desktop app: a warm dark ground, white text,
+   line-height 1.75, a 656px measure, Serif Text for prose and Serif Display
+   for headings. The fonts are never shipped with the site — they are loaded
+   from the phone's own files and kept on the phone. */
+
+:root {
+  --bg: #383835;
+  --panel: #302f2d;
+  --fg: #ffffff;
+  --muted: #e8e8e8;
+  --subtle: #9a978f;
+  --rule: #5a5a55;
+  --link: #dddddd;
+  --fs: 18px;
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --serif: 'Serif Text', Georgia, 'Times New Roman', serif;
+  --display: 'Serif Display', 'Serif Text', Georgia, 'Times New Roman', serif;
+  --ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+[hidden] { display: none !important; }
+html { background: var(--bg); }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--ui);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.vh { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
+
+/* ---------- top bar (reader only) ---------- */
+
+#bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+  display: flex; align-items: center; gap: 2px;
+  padding: calc(var(--sat) + 4px) calc(var(--sar) + 6px) 6px calc(var(--sal) + 6px);
+  background: rgba(56, 56, 53, 0.94);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(90, 90, 85, 0.6);
+  transition: transform 0.22s ease;
+}
+#bar.hidden { transform: translateY(-100%); }
+body[data-view="library"] #bar { display: none; }
+
+.icon-btn {
+  width: 44px; height: 40px; flex: none;
+  display: grid; place-items: center;
+  border-radius: 10px; color: var(--muted);
+}
+.icon-btn:active { background: rgba(255, 255, 255, 0.08); }
+.icon-btn svg { width: 22px; height: 22px; }
+#btn-aa { font: 600 17px var(--display); }
+
+#title-wrap { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 7px; }
+#title { font: 600 15px/1.2 var(--ui); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#live-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: #a8c090; }
+#live-dot.stale { background: #d9c089; }
+
+/* ---------- the story ---------- */
+
+#doc {
+  display: none;
+  max-width: 656px;
+  margin: 0 auto;
+  padding: calc(var(--sat) + 72px) calc(var(--sar) + 22px) calc(var(--sab) + 45vh) calc(var(--sal) + 22px);
+  font-family: var(--serif);
+  font-size: var(--fs);
+  font-weight: 400;
+  line-height: 1.75;
+  overflow-wrap: break-word;
+}
+body[data-view="reader"] #doc { display: block; }
+#doc > :first-child { margin-top: 0; }
+#doc p { margin: 0 0 1em; }
+#doc h1, #doc h2, #doc h3, #doc h4, #doc h5, #doc h6 {
+  font-family: var(--display); font-weight: 600; line-height: 1.3;
+  margin: 2.2em 0 0.6em; color: var(--fg);
+}
+#doc h1 { font-size: 1.7em; }
+#doc h2 { font-size: 1.35em; }
+#doc h3 { font-size: 1.15em; }
+#doc h4, #doc h5, #doc h6 { font-size: 1em; }
+#doc blockquote { border-left: 3px solid var(--rule); margin: 1.2em 0; padding-left: 1.2em; color: var(--muted); }
+#doc hr { border: 0; border-top: 1px solid var(--rule); margin: 3em auto; width: 40%; }
+#doc a { color: var(--link); text-underline-offset: 3px; }
+#doc strong { font-weight: 600; }
+#doc em { font-style: italic; }
+#doc ul, #doc ol { padding-left: 1.4em; margin: 0 0 1em; }
+#doc code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.85em; background: var(--panel); padding: 0.1em 0.3em; border-radius: 4px; }
+#doc pre { background: var(--panel); padding: 12px 14px; border-radius: 8px; overflow-x: auto; font-size: 0.85em; line-height: 1.5; }
+#doc pre code { background: none; padding: 0; }
+#doc img { max-width: 100%; }
+#doc table { border-collapse: collapse; display: block; overflow-x: auto; margin: 0 0 1em; }
+#doc th, #doc td { border: 1px solid var(--rule); padding: 4px 8px; }
+
+/* ---------- library ---------- */
+
+#library {
+  max-width: 656px; min-height: 100vh; margin: 0 auto;
+  padding: calc(var(--sat) + 28px) calc(var(--sar) + 20px) calc(var(--sab) + 40px) calc(var(--sal) + 20px);
+}
+body[data-view="reader"] #library { display: none; }
+.lib-title { font: 600 32px/1.2 var(--display); margin: 8px 0 18px; }
+.lib-actions { display: flex; gap: 10px; margin-bottom: 22px; }
+.btn {
+  flex: 1; height: 46px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--panel); border: 1px solid var(--rule);
+  font: 500 15px var(--ui); color: var(--fg);
+}
+.btn:active { background: #44443f; }
+#lib-list { list-style: none; margin: 0; padding: 0; }
+#lib-list:not(:empty) { border-top: 1px solid var(--rule); }
+#lib-list li { display: flex; border-bottom: 1px solid var(--rule); }
+.story { flex: 1; min-width: 0; text-align: left; padding: 14px 4px; }
+.story:active { background: rgba(255, 255, 255, 0.04); }
+.s-title { display: block; font: 600 18px/1.3 var(--display); color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.s-meta { display: block; margin-top: 4px; font: 13px/1.35 var(--ui); color: var(--subtle); }
+.s-del { width: 44px; flex: none; color: var(--subtle); font-size: 22px; }
+#lib-empty { color: var(--subtle); font: 15px/1.6 var(--ui); margin: 24px 4px; }
+.lib-foot { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font: 14px var(--ui); color: var(--subtle); }
+.link { color: var(--link); text-decoration: underline; text-underline-offset: 3px; font: 14px var(--ui); }
+
+/* ---------- contents drawer ---------- */
+
+#scrim { position: fixed; inset: 0; z-index: 30; background: rgba(0, 0, 0, 0.45); }
+#toc {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 31;
+  width: min(86vw, 380px);
+  padding: calc(var(--sat) + 16px) calc(var(--sar) + 8px) calc(var(--sab) + 24px) 8px;
+  background: var(--panel); border-left: 1px solid var(--rule);
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  transform: translateX(100%); transition: transform 0.22s ease;
+  visibility: hidden;
+}
+#toc.open { transform: none; visibility: visible; }
+#toc h2 { margin: 4px 12px 10px; font: 600 13px var(--ui); letter-spacing: 0.06em; text-transform: uppercase; color: var(--subtle); }
+#toc-list { list-style: none; margin: 0; padding: 0; }
+#toc-list a { display: block; padding: 10px 12px; border-radius: 8px; color: var(--muted); text-decoration: none; font: 16px/1.35 var(--serif); }
+#toc-list .d2 a { padding-left: 24px; font-size: 15px; }
+#toc-list .d3 a { padding-left: 36px; font-size: 14px; color: var(--subtle); }
+#toc-list a.active { background: rgba(255, 255, 255, 0.09); color: var(--fg); }
+
+/* ---------- text size ---------- */
+
+#aa-pop {
+  position: fixed; z-index: 25;
+  top: calc(var(--sat) + 56px); right: calc(var(--sar) + 10px);
+  display: flex; align-items: center; gap: 4px; padding: 6px;
+  background: var(--panel); border: 1px solid var(--rule); border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+#aa-pop button { width: 50px; height: 40px; border-radius: 8px; font: 600 17px var(--display); }
+#aa-pop button:active { background: rgba(255, 255, 255, 0.1); }
+#fs-val { min-width: 44px; text-align: center; font: 14px var(--ui); color: var(--subtle); }
+
+/* ---------- Google Drive browser ---------- */
+
+#drive-sheet { position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column; background: var(--bg); }
+#drive-head {
+  display: flex; align-items: center; gap: 6px;
+  padding: calc(var(--sat) + 8px) calc(var(--sar) + 12px) 10px calc(var(--sal) + 6px);
+  border-bottom: 1px solid var(--rule);
+}
+#drive-path { flex: 1; min-width: 0; font: 600 15px var(--ui); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pill { padding: 8px 14px; border-radius: 999px; background: var(--panel); border: 1px solid var(--rule); font: 500 14px var(--ui); }
+#drive-list { flex: 1; overflow-y: auto; list-style: none; margin: 0; padding: 0 calc(var(--sar) + 8px) calc(var(--sab) + 20px) calc(var(--sal) + 8px); }
+#drive-list button { width: 100%; display: flex; align-items: center; gap: 12px; padding: 13px 8px; text-align: left; border-bottom: 1px solid rgba(90, 90, 85, 0.5); font: 16px/1.3 var(--ui); color: var(--fg); }
+#drive-list button:active { background: rgba(255, 255, 255, 0.05); }
+#drive-list .ico { width: 20px; flex: none; text-align: center; color: var(--subtle); }
+#drive-list .sub { display: block; margin-top: 2px; font-size: 12px; color: var(--subtle); }
+#drive-list .note { padding: 24px 8px; color: var(--subtle); font: 15px/1.5 var(--ui); }
+
+/* ---------- banner & toast ---------- */
+
+#banner {
+  position: fixed; z-index: 26;
+  left: calc(var(--sal) + 12px); right: calc(var(--sar) + 12px); bottom: calc(var(--sab) + 14px);
+  display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 14px;
+  background: var(--panel); border: 1px solid var(--rule); border-radius: 12px;
+  font: 14px/1.35 var(--ui); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+#banner-text { flex: 1; color: var(--muted); }
+#banner-btn { flex: none; padding: 8px 12px; border-radius: 8px; background: var(--rule); font-weight: 600; }
+
+#toast {
+  position: fixed; z-index: 27; left: 50%; bottom: calc(var(--sab) + 24px);
+  transform: translateX(-50%); padding: 9px 16px; border-radius: 999px;
+  background: rgba(48, 47, 45, 0.96); border: 1px solid var(--rule);
+  font: 14px var(--ui); color: var(--muted); white-space: nowrap;
+  pointer-events: none; opacity: 0; transition: opacity 0.25s;
+}
+#toast.show { opacity: 1; }
+
+/* Hidden until start-up has chosen between the library and the last story,
+   so reopening the app does not flash the library first. */
+.booting #library, .booting #doc, .booting #bar { visibility: hidden; }
