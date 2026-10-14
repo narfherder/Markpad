@@ -7,8 +7,52 @@
 'use strict';
 
 const CFG = window.READER_CONFIG || {};
+const APP_VERSION = '2026-10-13.2';
 const $ = (sel) => document.querySelector(sel);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/* -------------------------------------------------------- diagnostics */
+
+// An iPhone cannot be inspected from the PC, so the app keeps its own trail:
+// the last steps it took, held in sessionStorage so they outlive a restart
+// iOS forces on the page, and shown on screen whenever something fails.
+const CRUMBS = 'reader-crumbs';
+const OPENING = 'reader-opening';
+
+function crumb(message) {
+  try {
+    const list = JSON.parse(sessionStorage.getItem(CRUMBS) || '[]');
+    list.push(new Date().toTimeString().slice(0, 8) + '  ' + message);
+    sessionStorage.setItem(CRUMBS, JSON.stringify(list.slice(-40)));
+  } catch { /* diagnostics must never be the thing that breaks */ }
+}
+function crumbs() {
+  try { return JSON.parse(sessionStorage.getItem(CRUMBS) || '[]'); } catch { return []; }
+}
+
+const shownErrors = new Set();
+function showDiagnostics(title, detail = '') {
+  const lines = [
+    `Markpad Reader ${APP_VERSION}`, title, detail, '',
+    'Recent steps:', ...crumbs().slice(-15), '',
+    navigator.userAgent,
+  ];
+  $('#err-text').textContent = lines.join('\n');
+  $('#errors').hidden = false;
+}
+function reportError(where, err) {
+  const detail = err && err.message
+    ? `${err.name || 'Error'}: ${err.message}${err.stack ? '\n' + err.stack.split('\n').slice(0, 4).join('\n') : ''}`
+    : String(err);
+  crumb(`ERROR in ${where}: ${detail.split('\n')[0]}`);
+  // A broken storage layer fails on every scroll; say so once, not forever.
+  const key = where + detail.split('\n')[0];
+  if (shownErrors.has(key)) return;
+  shownErrors.add(key);
+  showDiagnostics(`Something went wrong: ${where}`, detail);
+}
+window.addEventListener('error', (e) => reportError('page', e.error || e.message));
+window.addEventListener('unhandledrejection', (e) => reportError('background task', e.reason));
 
 /* ------------------------------------------------------------ storage */
 
@@ -25,14 +69,20 @@ function openDb() {
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);
+      req.onblocked = () => reject(new Error('Storage is blocked by another copy of the app'));
+      setTimeout(() => reject(new Error('Storage did not open (IndexedDB timed out)')), 8000);
     });
+    dbPromise.catch(() => { dbPromise = null; });   // let the next call try again
   }
   return dbPromise;
 }
-function settle(req) {
+// Bounded: a storage request that never answers would otherwise hang whatever
+// awaited it, and every button that reads storage would silently do nothing.
+function settle(req, ms = 8000) {
   return new Promise((resolve, reject) => {
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    const timer = setTimeout(() => reject(new Error('Storage did not respond (IndexedDB timed out)')), ms);
+    req.onsuccess = () => { clearTimeout(timer); resolve(req.result); };
+    req.onerror = () => { clearTimeout(timer); reject(req.error || new Error('Storage error')); };
   });
 }
 async function objectStore(name, mode = 'readonly') {
@@ -191,7 +241,11 @@ async function savePosition() {
   const max = document.documentElement.scrollHeight - window.innerHeight;
   current.progress = max > 0 ? Math.min(100, Math.round((window.scrollY / max) * 100)) : 0;
   current.readAt = Date.now();
-  await idb.put('stories', current);
+  try {
+    await idb.put('stories', current);
+  } catch (err) {
+    reportError('saving your place', err);
+  }
 }
 
 let lastY = 0;
@@ -393,11 +447,13 @@ $('#font-input').addEventListener('change', async (e) => {
 /* ------------------------------------------------------------- library */
 
 async function openStory(story) {
+  crumb(`open "${story.title}" (${Math.round((story.text || '').length / 1024)} KB, ${story.source})`);
+  // Marks an open in progress. If iOS kills the page part-way through, the
+  // next start finds this still set and says so instead of failing silently.
+  try { sessionStorage.setItem(OPENING, `${story.title} (${Math.round((story.text || '').length / 1024)} KB)`); } catch {}
   await savePosition();
   current = story;
   current.openedAt = Date.now();
-  await idb.put('stories', current);
-  await kv.set('current', current.id);
   closeToc();
   closeAa();
   hideBanner();
@@ -405,6 +461,7 @@ async function openStory(story) {
   bar.classList.remove('hidden');
   $('#title').textContent = current.title;
   render(current.text);
+  crumb(`rendered ${blocks.length} blocks, ${headings.length} headings`);
   // Bounded, and no waiting on an animation frame: a page started or resumed
   // in the background draws no frames, and start-up stalled there with the
   // story invisible. Reading offsetHeight lays the page out on the spot.
@@ -415,20 +472,34 @@ async function openStory(story) {
   liveState = 'live';
   if (current.source === 'drive') startLive(); else stopLive();
   updateLiveDot();
+  try { sessionStorage.removeItem(OPENING); } catch {}
+  crumb('open finished');
+
+  // Saved only once the story is on screen, and never awaited by it: storage
+  // trouble must not stand between you and the page. Remembering it as the
+  // open story comes last, so a story that crashes while rendering is not
+  // reopened automatically on the next start.
+  idb.put('stories', current).catch((err) => reportError('saving the story', err));
+  kv.set('current', current.id).catch((err) => reportError('remembering the open story', err));
 }
 
 async function showLibrary() {
   await savePosition();
   stopLive();
   current = null;
-  await kv.set('current', null);
+  kv.set('current', null).catch((err) => reportError('leaving the story', err));
   closeToc();
   closeAa();
   hideBanner();
   document.body.dataset.view = 'library';
   window.scrollTo(0, 0);
-  const stories = (await idb.all('stories'))
-    .sort((a, b) => (b.readAt || b.openedAt || 0) - (a.readAt || a.openedAt || 0));
+  let stories = [];
+  try {
+    stories = (await idb.all('stories'))
+      .sort((a, b) => (b.readAt || b.openedAt || 0) - (a.readAt || a.openedAt || 0));
+  } catch (err) {
+    reportError('loading the library', err);
+  }
   $('#lib-list').replaceChildren(...stories.map(storyRow));
   $('#lib-empty').hidden = stories.length > 0;
   updateDriveButton();
@@ -485,12 +556,12 @@ $('#file-input').addEventListener('change', async (e) => {
   const file = e.target.files && e.target.files[0];
   e.target.value = '';
   if (!file) return;
+  crumb(`files: picked ${file.name} (${Math.round(file.size / 1024)} KB)`);
   const text = await file.text();
   const id = 'file:' + file.name;
-  const previous = (await idb.get('stories', id)) || {};
+  const previous = await idb.get('stories', id).catch(() => null) || {};
   const story = { ...previous, id, source: 'file', name: file.name, title: titleFrom(file.name), text };
-  await idb.put('stories', story);
-  openStory(story);
+  await openStory(story);
 });
 
 /* -------------------------------------------------------- Google Drive */
@@ -666,24 +737,29 @@ async function loadFolder() {
 }
 
 async function openDriveFile(file) {
+  crumb(`drive: open ${file.name}`);
   driveList.replaceChildren(note('Opening ' + file.name + '…'));
+  let story;
   try {
     const meta = await drive(`files/${file.id}?fields=id,name,version&supportsAllDrives=true`);
+    crumb(`drive: metadata ok (version ${meta.version})`);
     const text = await drive(`files/${file.id}?alt=media&supportsAllDrives=true`, true);
+    crumb(`drive: downloaded ${Math.round(text.length / 1024)} KB`);
     const id = 'drive:' + file.id;
-    const previous = (await idb.get('stories', id)) || {};
-    const story = {
+    const previous = await idb.get('stories', id).catch(() => null) || {};
+    story = {
       ...previous, id, source: 'drive', driveId: file.id,
       name: meta.name, title: titleFrom(meta.name), text, version: meta.version,
     };
-    await idb.put('stories', story);
-    sheet.hidden = true;
-    openStory(story);
   } catch (err) {
+    crumb(`drive: open failed: ${err.message || err}`);
     if (err instanceof DriveAuthError) { sheet.hidden = true; needReconnect(); return; }
     loadFolder();
-    toast('Couldn’t open that file');
+    reportError('opening ' + file.name, err);
+    return;
   }
+  sheet.hidden = true;
+  await openStory(story);
 }
 
 // --- live reload
@@ -761,25 +837,51 @@ function toast(message) {
 
 /* --------------------------------------------------------------- start */
 
+/* ------------------------------------------- library footer, panel */
+
+$('#app-version').textContent = 'Version ' + APP_VERSION;
+$('#btn-diag').addEventListener('click', () => showDiagnostics('Diagnostics (nothing has failed)'));
+$('#btn-reload').addEventListener('click', () => location.reload());
+$('#err-reload').addEventListener('click', () => location.reload());
+$('#err-close').addEventListener('click', () => { $('#errors').hidden = true; });
+$('#err-copy').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText($('#err-text').textContent);
+    toast('Copied');
+  } catch {
+    toast('Couldn’t copy — take a screenshot instead');
+  }
+});
+
 async function start() {
+  crumb(`start ${APP_VERSION}${location.hash ? ' (returning from Google)' : ''}`);
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 
+  // An open that never reached its end means iOS restarted the page under it.
+  let interrupted = null;
+  try { interrupted = sessionStorage.getItem(OPENING); sessionStorage.removeItem(OPENING); } catch {}
+
   fontsReady = loadStoredFonts()
     .then((families) => { fontFamilies = families; updateFontStatus(); })
-    .catch(() => {});
-  applyFontSize((await kv.get('fontSize')) || 18);
+    .catch((err) => reportError('loading your fonts', err));
+  applyFontSize((await kv.get('fontSize').catch(() => null)) || 18);
   updateFontStatus();
 
-  const signIn = await finishSignIn();
-  const id = signIn ? signIn.returnTo : await kv.get('current');
-  const story = id ? await idb.get('stories', id) : null;
+  const signIn = await finishSignIn().catch((err) => { reportError('finishing Google sign-in', err); return undefined; });
+  const id = signIn ? signIn.returnTo : await kv.get('current').catch(() => null);
+  const story = id ? await idb.get('stories', id).catch(() => null) : null;
 
-  if (story) {
+  if (interrupted) {
+    showDiagnostics('The app restarted while opening a story, so it went back to the library.',
+      `Story: ${interrupted}`);
+  }
+
+  if (story && !interrupted) {
     // Back on a Drive story after the hour-long sign-in has lapsed: renew it
     // once, silently, before anyone has to tap anything.
-    if (story.source === 'drive' && !signIn && !(await driveToken())
-        && (await driveConnected()) && !sessionStorage.getItem('renewTried')) {
+    if (story.source === 'drive' && !signIn && !(await driveToken().catch(() => null))
+        && (await driveConnected().catch(() => false)) && !sessionStorage.getItem('renewTried')) {
       sessionStorage.setItem('renewTried', '1');
       current = story;
       driveSignIn(true);
@@ -795,7 +897,7 @@ async function start() {
 
 start().catch((err) => {
   document.body.classList.remove('booting');
-  console.error(err);
-  toast('Something went wrong starting up');
+  document.body.dataset.view = 'library';
+  reportError('starting up', err);
 });
 })();

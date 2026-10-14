@@ -38,6 +38,11 @@
     <span id="font-status"></span>
     <button class="link" id="btn-fonts">Load fonts…</button>
   </div>
+  <div class="lib-foot lib-meta">
+    <span id="app-version"></span>
+    <button class="link" id="btn-diag">Diagnostics</button>
+    <button class="link" id="btn-reload">Reload app</button>
+  </div>
 </section>
 
 <article id="doc"></article>
@@ -67,6 +72,15 @@
 
 <div id="banner" hidden><span id="banner-text"></span><button id="banner-btn"></button></div>
 <div id="toast" role="status"></div>
+
+<section id="errors" hidden role="alert">
+  <pre id="err-text"></pre>
+  <div class="err-actions">
+    <button id="err-copy">Copy</button>
+    <button id="err-reload">Reload app</button>
+    <button id="err-close">Dismiss</button>
+  </div>
+</section>
 
 <input type="file" id="file-input" class="vh" tabindex="-1">
 <input type="file" id="font-input" class="vh" tabindex="-1" multiple>

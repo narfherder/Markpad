@@ -203,3 +203,25 @@ body[data-view="reader"] #library { display: none; }
 /* Hidden until start-up has chosen between the library and the last story,
    so reopening the app does not flash the library first. */
 .booting #library, .booting #doc, .booting #bar { visibility: hidden; }
+
+/* ---------- diagnostics ---------- */
+
+.lib-meta { margin-top: 14px; font-size: 13px; }
+.lib-meta .link { font-size: 13px; }
+#errors {
+  position: fixed; z-index: 60;
+  left: calc(var(--sal) + 10px); right: calc(var(--sar) + 10px); bottom: calc(var(--sab) + 10px);
+  max-height: 62vh; display: flex; flex-direction: column; overflow: hidden;
+  background: #2a2927; border: 1px solid #d98a7b; border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+#err-text {
+  margin: 0; padding: 12px 14px; overflow: auto; -webkit-overflow-scrolling: touch;
+  font: 12px/1.45 ui-monospace, Menlo, Consolas, monospace; color: var(--muted);
+  white-space: pre-wrap; word-break: break-word; user-select: text; -webkit-user-select: text;
+}
+.err-actions { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--rule); }
+.err-actions button {
+  flex: 1; height: 40px; border-radius: 8px;
+  background: var(--panel); border: 1px solid var(--rule); font: 600 14px var(--ui);
+}
