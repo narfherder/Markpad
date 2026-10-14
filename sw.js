@@ -1,7 +1,7 @@
 // Keeps the reader working offline. Network first, so a new version reaches the
 // phone the next time it is online; the cached copy is the fallback. Requests to
 // other origins (Google) are never touched.
-const CACHE = 'markpad-reader-v2';
+const CACHE = 'markpad-reader-v3';
 const SHELL = [
   './', './index.html', './style.css', './app.js', './config.js', './marked.umd.js',
   './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png',

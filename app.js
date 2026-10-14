@@ -7,7 +7,7 @@
 'use strict';
 
 const CFG = window.READER_CONFIG || {};
-const APP_VERSION = '2026-10-13.2';
+const APP_VERSION = '2026-10-13.3';
 const $ = (sel) => document.querySelector(sel);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -60,12 +60,34 @@ let dbPromise = null;
 function openDb() {
   if (!dbPromise) {
     dbPromise = new Promise((resolve, reject) => {
-      const req = indexedDB.open('markpad-reader', 1);
-      req.onupgradeneeded = () => {
+      const req = indexedDB.open('markpad-reader', 2);
+      req.onupgradeneeded = (event) => {
         const db = req.result;
-        db.createObjectStore('stories', { keyPath: 'id' });
-        db.createObjectStore('fonts', { keyPath: 'name' });
-        db.createObjectStore('kv');
+        if (event.oldVersion < 1) {
+          db.createObjectStore('stories', { keyPath: 'id' });
+          db.createObjectStore('fonts', { keyPath: 'name' });
+          db.createObjectStore('kv');
+        }
+        if (event.oldVersion < 2) {
+          // Version 1 kept each story's whole text inside its library record,
+          // so saving a reading position on every pause in scrolling rewrote
+          // the entire story — 2.3 MB at a time for the longest book — and
+          // listing the library loaded every story into memory just for its
+          // title. The text now lives on its own and is written only when it
+          // changes; library records shrink to a few hundred bytes.
+          const texts = db.createObjectStore('texts');
+          req.transaction.objectStore('stories').openCursor().onsuccess = (e) => {
+            const cursor = e.target.result;
+            if (!cursor) return;
+            const story = cursor.value;
+            if (typeof story.text === 'string') {
+              texts.put(story.text, story.id);
+              delete story.text;
+              cursor.update(story);
+            }
+            cursor.continue();
+          };
+        }
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);
@@ -101,6 +123,19 @@ const kv = {
   get: (key) => idb.get('kv', key),
   set: (key, value) => idb.put('kv', value, key),
 };
+
+// A story in memory carries its text; on disk the text is stored separately.
+function recordOf(story) {
+  const { text, ...record } = story;
+  return record;
+}
+function saveRecord(story) {
+  return idb.put('stories', recordOf(story));
+}
+function saveText(story) {
+  return idb.put('texts', story.text, story.id)
+    .catch((err) => reportError('saving the story text', err));
+}
 
 /* ----------------------------------------------------------- markdown */
 
@@ -242,7 +277,7 @@ async function savePosition() {
   current.progress = max > 0 ? Math.min(100, Math.round((window.scrollY / max) * 100)) : 0;
   current.readAt = Date.now();
   try {
-    await idb.put('stories', current);
+    await saveRecord(current);
   } catch (err) {
     reportError('saving your place', err);
   }
@@ -446,7 +481,7 @@ $('#font-input').addEventListener('change', async (e) => {
 
 /* ------------------------------------------------------------- library */
 
-async function openStory(story) {
+async function openStory(story, { textChanged = false } = {}) {
   crumb(`open "${story.title}" (${Math.round((story.text || '').length / 1024)} KB, ${story.source})`);
   // Marks an open in progress. If iOS kills the page part-way through, the
   // next start finds this still set and says so instead of failing silently.
@@ -479,8 +514,38 @@ async function openStory(story) {
   // trouble must not stand between you and the page. Remembering it as the
   // open story comes last, so a story that crashes while rendering is not
   // reopened automatically on the next start.
-  idb.put('stories', current).catch((err) => reportError('saving the story', err));
+  saveRecord(current).catch((err) => reportError('saving the story', err));
+  if (textChanged) saveText(current);
   kv.set('current', current.id).catch((err) => reportError('remembering the open story', err));
+}
+
+// Library records carry no text; it is read from its own store, and a Drive
+// story whose stored copy is missing (an earlier save that failed) is simply
+// downloaded again rather than refusing to open.
+async function openFromLibrary(record) {
+  const text = await idb.get('texts', record.id).catch((err) => {
+    reportError('reading the stored story', err);
+    return undefined;
+  });
+  if (typeof text === 'string') {
+    await openStory({ ...record, text });
+    return;
+  }
+  if (record.source !== 'drive') {
+    toast('Not stored on this phone — open it from Files again');
+    return;
+  }
+  crumb(`library: no stored copy of ${record.title}, downloading`);
+  try {
+    toast('Downloading…');
+    const meta = await drive(`files/${record.driveId}?fields=id,name,version&supportsAllDrives=true`);
+    const fresh = await drive(`files/${record.driveId}?alt=media&supportsAllDrives=true`, true);
+    await openStory({ ...record, name: meta.name, title: titleFrom(meta.name), version: meta.version, text: fresh },
+      { textChanged: true });
+  } catch (err) {
+    if (err instanceof DriveAuthError) { needReconnect(); return; }
+    reportError('downloading ' + record.title, err);
+  }
 }
 
 async function showLibrary() {
@@ -520,7 +585,7 @@ function storyRow(story) {
     ago(story.readAt || story.openedAt),
   ].filter(Boolean).join(' · ');
   open.append(title, meta);
-  open.addEventListener('click', () => openStory(story));
+  open.addEventListener('click', () => openFromLibrary(story));
 
   const remove = document.createElement('button');
   remove.className = 's-del';
@@ -528,7 +593,8 @@ function storyRow(story) {
   remove.setAttribute('aria-label', 'Remove ' + story.title);
   remove.addEventListener('click', async () => {
     if (!confirm(`Remove “${story.title}” from the library? The file itself is not touched.`)) return;
-    await idb.del('stories', story.id);
+    await idb.del('stories', story.id).catch((err) => reportError('removing the story', err));
+    await idb.del('texts', story.id).catch(() => {});
     showLibrary();
   });
   li.append(open, remove);
@@ -561,7 +627,7 @@ $('#file-input').addEventListener('change', async (e) => {
   const id = 'file:' + file.name;
   const previous = await idb.get('stories', id).catch(() => null) || {};
   const story = { ...previous, id, source: 'file', name: file.name, title: titleFrom(file.name), text };
-  await openStory(story);
+  await openStory(story, { textChanged: true });
 });
 
 /* -------------------------------------------------------- Google Drive */
@@ -759,7 +825,7 @@ async function openDriveFile(file) {
     return;
   }
   sheet.hidden = true;
-  await openStory(story);
+  await openStory(story, { textChanged: true });
 }
 
 // --- live reload
@@ -797,6 +863,7 @@ async function checkLive() {
       render(text);
       restoreAnchor(anchor);
       $('#title').textContent = story.title;
+      saveText(story);
       await savePosition();
       toast('Updated');
     }
@@ -887,7 +954,7 @@ async function start() {
       driveSignIn(true);
       return;
     }
-    await openStory(story);
+    await openFromLibrary(story);
   } else {
     await showLibrary();
     if (signIn && signIn.after === 'browse') openDriveBrowser();
