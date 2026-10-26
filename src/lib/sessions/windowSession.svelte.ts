@@ -185,6 +185,21 @@ export function createWindowSession(options: WindowSessionOptions) {
 		}
 	}
 
+	/**
+	 * Writes the snapshot while the window is still open. The close handler is
+	 * otherwise the only writer, and a process that dies first — a crash, End
+	 * task, Windows restarting with Markpad open — never reaches it, so the next
+	 * launch restored whatever was open when this one started.
+	 */
+	async function checkpoint() {
+		if (!options.isMainWindow) return;
+		try {
+			await invoke('save_window_state', { json: options.serializeState() });
+		} catch (error) {
+			options.onWarning('Failed to checkpoint window state', error);
+		}
+	}
+
 	async function restore() {
 		if (!options.isMainWindow || options.isDisposed()) return;
 		if (!options.shouldRestoreState()) {
@@ -429,5 +444,5 @@ export function createWindowSession(options: WindowSessionOptions) {
 		return transfer(tabId, (token) => invoke('create_transfer_window', { token }));
 	}
 
-	return { discardPersistedState, persistState, restore, claimTransferredTab, acceptOfferedTransfer, detach, transfer };
+	return { discardPersistedState, persistState, checkpoint, restore, claimTransferredTab, acceptOfferedTransfer, detach, transfer };
 }

@@ -718,14 +718,29 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 	// to the WebKit storage process that dies in transit when the last
 	// window's close ends the process (reproduced in QA as "close secondary
 	// first, then main → snapshot gone"). An awaited invoke keeps the close
-	// handler — and the process — alive until the bytes are on disk, so one
-	// deterministic write at close replaces any keep-writing-while-running
-	// scheme. The localStorage keys are read once for migration and removed
-	// after the first successful Rust write; a downgraded build then starts
-	// a fresh session instead of misreading anything.
+	// handler — and the process — alive until the bytes are on disk, so the
+	// write at close is the one that records the final state; the checkpoint
+	// below only covers a process that never gets to close. The localStorage
+	// keys are read once for migration and removed after the first successful
+	// Rust write; a downgraded build then starts a fresh session instead of
+	// misreading anything.
 	async function persistWindowState() {
 		await windowSession.persistState();
 	}
+
+	// The close-time write above never happens if the process dies first, so
+	// the snapshot is also checkpointed a moment after the tab list, active tab
+	// or a tab's scroll position changes. Not before startup is over: until
+	// then the file on disk is the only complete record of the session.
+	const CHECKPOINT_DELAY_MS = 1000;
+	$effect(() => {
+		if (mode !== 'app' || isForceExiting || !settings.restoreStateOnReopen) return;
+		tabManager.serializeState();
+		const timer = setTimeout(() => {
+			if (!isDisposed && !isForceExiting) void windowSession.checkpoint();
+		}, CHECKPOINT_DELAY_MS);
+		return () => clearTimeout(timer);
+	});
 
 	// Exit discards the snapshot on purpose — it is how "quit" differs from
 	// closing the window — but only once startup is over. Until `init` sets
@@ -750,8 +765,9 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 				});
 				if (response !== 'discard') return;
 			}
-			await discardPersistedWindowState();
+			// Set first so a checkpoint cannot rewrite the snapshot mid-discard.
 			isForceExiting = true;
+			await discardPersistedWindowState();
 		}
 		appWindow.close();
 	}
