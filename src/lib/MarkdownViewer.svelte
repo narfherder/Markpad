@@ -710,10 +710,6 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 		onCloseAutoSaveFailed: () => addToast(t('toast.autoSaveFailed', settings.language), 'error'),
 	});
 
-	async function discardPersistedWindowState() {
-		await windowSession.discardPersistedState();
-	}
-
 	// Persisted through Rust, not localStorage: setItem is an async message
 	// to the WebKit storage process that dies in transit when the last
 	// window's close ends the process (reproduced in QA as "close secondary
@@ -742,17 +738,13 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 		return () => clearTimeout(timer);
 	});
 
-	// Exit discards the snapshot on purpose — it is how "quit" differs from
-	// closing the window — but only once startup is over. Until `init` sets
-	// `mode` to 'app', the file on disk is still the only complete record of
-	// the session: `restore()` has rebuilt the tab list but is partway through
-	// reading those files back. That window is short unless a restored path is
-	// unreachable, and then it is the share timeout, once per tab, serially —
-	// which is exactly when the user starts looking for a way out. The loading
-	// screen renders the ☰ menu while every keyboard shortcut is inert
-	// (`handleKeyDown` returns on `mode !== 'app'`), so Exit is the control
-	// they reach. Discarding there costs them the session they were waiting
-	// for; falling through to a plain close writes it back instead.
+	// Exit skips the per-tab review — one confirmation covers every unsaved
+	// buffer — but keeps the tab list like a window close does. It used to
+	// discard the snapshot, so whether the next launch came back with your
+	// tabs depended on which of two controls you had used to leave. Only once
+	// startup is over: until `init` sets `mode` to 'app', `restore()` is still
+	// reading files back, the loading screen renders the ☰ menu while every
+	// keyboard shortcut is inert, and a plain close is the safer way out.
 	async function appExit() {
 		await savePinnedTagIfNeeded();
 		if (settings.restoreStateOnReopen && mode === 'app') {
@@ -765,9 +757,8 @@ import { createDocumentSession, type LoadMarkdownOptions } from './sessions/docu
 				});
 				if (response !== 'discard') return;
 			}
-			// Set first so a checkpoint cannot rewrite the snapshot mid-discard.
 			isForceExiting = true;
-			await discardPersistedWindowState();
+			await persistWindowState();
 		}
 		appWindow.close();
 	}
