@@ -529,6 +529,8 @@ pub fn create_transfer_window(app: AppHandle, token: String) -> Result<(), Strin
     }
     let window = builder.build().map_err(|e| e.to_string())?;
     let _ = window.set_shadow(true);
+    #[cfg(target_os = "windows")]
+    crate::taskbar_gap::install(&window);
     Ok(())
 }
 

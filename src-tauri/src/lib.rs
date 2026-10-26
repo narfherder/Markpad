@@ -763,6 +763,8 @@ fn validate_vsix_archive_limits<R: std::io::Read + std::io::Seek>(
 mod asset_protocol;
 mod error;
 mod tab_transfer;
+#[cfg(target_os = "windows")]
+mod taskbar_gap;
 mod window_runtime;
 use window_runtime::{AppState, WatcherState};
 
@@ -2974,6 +2976,9 @@ pub fn run() {
             }
 
             let window = window_builder.build()?;
+
+            #[cfg(target_os = "windows")]
+            taskbar_gap::install(&window);
 
             #[cfg(target_os = "macos")]
             {

@@ -244,7 +244,7 @@
 		if (scroll) {
 			const target = marks[safe];
 			const revealed = revealFoldsAround(target);
-			target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+			target.scrollIntoView({ block: 'center', behavior: 'instant' });
 			if (revealed) {
 				// The fold animates its height open, so the scroll above aimed
 				// at a target that was still moving. Re-aim once it settles.
@@ -253,7 +253,7 @@
 				// preview for a search that is already gone.
 				setTimeout(() => {
 					if (!target.isConnected) return;
-					target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+					target.scrollIntoView({ block: 'center', behavior: 'instant' });
 				}, FOLD_TRANSITION_MS);
 			}
 		}
