@@ -3,29 +3,31 @@
 //!
 //! When a window's client area covers the whole monitor, Explorer treats it as
 //! a full-screen app and stops raising the auto-hide taskbar. tao leaves the
-//! 1px gap itself, but it asks Explorer where the auto-hide bars are from
-//! inside WM_NCCALCSIZE, and that call intermittently comes back empty — the
-//! window then covers the screen and the taskbar stays hidden until the window
-//! is resized. This subclass sits in front of tao's and enforces the gap from
-//! an answer fetched ahead of time on a background thread.
+//! 1px gap itself, but only where Explorer's appbar query
+//! (`ABM_GETAUTOHIDEBAR`) reports an auto-hide bar, and Explorer can get into a
+//! state where that query — and `ABM_GETAUTOHIDEBAREX` — report no bar on any
+//! edge while `ABM_GETSTATE` says auto-hide is on and `ABM_GETTASKBARPOS` puts
+//! the taskbar at the bottom. Seen on a two-monitor setup, lasting across app
+//! restarts; Chromium falls back to the taskbar's own position for the same
+//! reason. This subclass sits in front of tao's and finds the taskbars
+//! directly: a taskbar window on the monitor whose edge the work area does not
+//! exclude is an auto-hide one. Nothing here sends a message to Explorer, so
+//! it can run inside WM_NCCALCSIZE.
 
-use std::sync::{Mutex, PoisonError};
 use std::time::Duration;
 
+use windows::core::{w, PCWSTR};
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM};
 use windows::Win32::Graphics::Gdi::{
     GetMonitorInfoW, MonitorFromRect, MonitorFromWindow, HMONITOR, MONITORINFO,
     MONITOR_DEFAULTTONEAREST, MONITOR_DEFAULTTONULL,
 };
-use windows::Win32::UI::Shell::{
-    DefSubclassProc, RemoveWindowSubclass, SHAppBarMessage, SetWindowSubclass, ABE_BOTTOM,
-    ABE_LEFT, ABE_RIGHT, ABE_TOP, ABM_GETAUTOHIDEBAREX, APPBARDATA,
-};
+use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetWindowPlacement, SetWindowPos, NCCALCSIZE_PARAMS, SIZE_MAXIMIZED, SWP_ASYNCWINDOWPOS,
-    SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOSIZE, SWP_NOZORDER,
-    SW_MAXIMIZE, WINDOWPLACEMENT, WM_DISPLAYCHANGE, WM_NCCALCSIZE, WM_NCDESTROY,
-    WM_SETTINGCHANGE, WM_SIZE,
+    FindWindowExW, GetWindowPlacement, GetWindowRect, SetWindowPos, NCCALCSIZE_PARAMS,
+    SWP_ASYNCWINDOWPOS, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER,
+    SWP_NOSIZE, SWP_NOZORDER, SW_MAXIMIZE, WINDOWPLACEMENT, WM_DISPLAYCHANGE, WM_NCCALCSIZE,
+    WM_NCDESTROY, WM_SETTINGCHANGE,
 };
 
 const SUBCLASS_ID: usize = 0x4D50_4741; // "MPGA"
@@ -34,28 +36,21 @@ const LEFT: u8 = 1;
 const TOP: u8 = 2;
 const RIGHT: u8 = 4;
 const BOTTOM: u8 = 8;
-const EDGES: [(u8, u32); 4] = [
-    (LEFT, ABE_LEFT),
-    (TOP, ABE_TOP),
-    (RIGHT, ABE_RIGHT),
-    (BOTTOM, ABE_BOTTOM),
-];
 
-/// Explorer applies taskbar setting changes shortly after it broadcasts them.
+/// Explorer moves its taskbars shortly after it broadcasts a setting change.
 const SETTLE_DELAY: Duration = Duration::from_millis(400);
-
-/// Auto-hide edges per monitor handle.
-static AUTOHIDE_EDGES: Mutex<Vec<(isize, u8)>> = Mutex::new(Vec::new());
 
 pub fn install(window: &tauri::WebviewWindow) {
     let Ok(hwnd) = window.hwnd() else { return };
     let raw = hwnd.0 as isize;
     // Subclasses must be installed from the thread that owns the window.
     let _ = window.run_on_main_thread(move || {
-        let installed =
-            unsafe { SetWindowSubclass(HWND(raw as _), Some(subclass_proc), SUBCLASS_ID, 0) };
-        if installed.as_bool() {
-            refresh(raw, Duration::ZERO);
+        let hwnd = HWND(raw as _);
+        let installed = unsafe { SetWindowSubclass(hwnd, Some(subclass_proc), SUBCLASS_ID, 0) };
+        // The window-state plugin may already have maximized the window, before
+        // this subclass existed to shape it.
+        if installed.as_bool() && is_maximized(hwnd) {
+            reframe(hwnd);
         }
     });
 }
@@ -75,24 +70,11 @@ unsafe extern "system" fn subclass_proc(
             // tao's handler runs here and sets the rect to the work area.
             let result = unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) };
             if !monitor.is_invalid() && is_maximized(hwnd) {
-                match cached_edges(monitor.0 as isize) {
-                    Some(edges) => keep_gap(unsafe { &mut (*params).rgrc[0] }, monitor, edges),
-                    None => refresh(hwnd.0 as isize, Duration::ZERO),
-                }
+                keep_gap(unsafe { &mut (*params).rgrc[0] }, monitor);
             }
             return result;
         }
-        WM_SIZE if wparam.0 == SIZE_MAXIMIZED as usize => {
-            let monitor = unsafe { MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) };
-            if cached_edges(monitor.0 as isize).is_none() {
-                refresh(hwnd.0 as isize, Duration::ZERO);
-            }
-        }
-        WM_SETTINGCHANGE => refresh(hwnd.0 as isize, SETTLE_DELAY),
-        WM_DISPLAYCHANGE => {
-            lock_cache().clear();
-            refresh(hwnd.0 as isize, SETTLE_DELAY);
-        }
+        WM_SETTINGCHANGE | WM_DISPLAYCHANGE => reframe_later(hwnd.0 as isize),
         WM_NCDESTROY => unsafe {
             let _ = RemoveWindowSubclass(hwnd, Some(subclass_proc), SUBCLASS_ID);
         },
@@ -101,8 +83,10 @@ unsafe extern "system" fn subclass_proc(
     unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) }
 }
 
-fn keep_gap(rect: &mut RECT, monitor: HMONITOR, edges: u8) {
-    let Some(screen) = monitor_rect(monitor) else { return };
+fn keep_gap(rect: &mut RECT, monitor: HMONITOR) {
+    let Some(info) = monitor_info(monitor) else { return };
+    let screen = info.rcMonitor;
+    let edges = autohide_edges(monitor, &info);
     if edges & LEFT != 0 && rect.left <= screen.left {
         rect.left = screen.left + 1;
     }
@@ -117,61 +101,88 @@ fn keep_gap(rect: &mut RECT, monitor: HMONITOR, edges: u8) {
     }
 }
 
-/// Asks Explorer for the window's monitor off the UI thread, then reframes the
-/// window if it is maximized and the answer changed.
-fn refresh(raw: isize, delay: Duration) {
-    std::thread::spawn(move || {
-        std::thread::sleep(delay);
-        let hwnd = HWND(raw as _);
-        let monitor = unsafe { MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) };
-        let Some(screen) = monitor_rect(monitor) else { return };
-        let edges = query_edges(screen);
-        if remember_edges(monitor.0 as isize, edges) != Some(edges) && is_maximized(hwnd) {
-            let _ = unsafe {
-                SetWindowPos(
-                    hwnd,
-                    None,
-                    0,
-                    0,
-                    0,
-                    0,
-                    SWP_FRAMECHANGED
-                        | SWP_NOMOVE
-                        | SWP_NOSIZE
-                        | SWP_NOZORDER
-                        | SWP_NOOWNERZORDER
-                        | SWP_NOACTIVATE
-                        | SWP_ASYNCWINDOWPOS,
-                )
-            };
-        }
-    });
-}
-
-fn query_edges(screen: RECT) -> u8 {
+/// Edges of `monitor` that hold an auto-hide taskbar: a taskbar window on that
+/// monitor whose edge is not reserved out of the work area, which is exactly
+/// what auto-hide changes.
+fn autohide_edges(monitor: HMONITOR, info: &MONITORINFO) -> u8 {
+    let (screen, work) = (info.rcMonitor, info.rcWork);
     let mut edges = 0;
-    for (bit, edge) in EDGES {
-        let mut data = APPBARDATA {
-            cbSize: std::mem::size_of::<APPBARDATA>() as u32,
-            uEdge: edge,
-            rc: screen,
-            ..Default::default()
-        };
-        if unsafe { SHAppBarMessage(ABM_GETAUTOHIDEBAREX, &mut data) } != 0 {
-            edges |= bit;
+    for class in [w!("Shell_TrayWnd"), w!("Shell_SecondaryTrayWnd")] {
+        let mut after = None;
+        while let Ok(bar) = unsafe { FindWindowExW(None, after, class, PCWSTR::null()) } {
+            after = Some(bar);
+            if unsafe { MonitorFromWindow(bar, MONITOR_DEFAULTTONEAREST) } != monitor {
+                continue;
+            }
+            let mut r = RECT::default();
+            if unsafe { GetWindowRect(bar, &mut r) }.is_err() {
+                continue;
+            }
+            let edge = if r.right - r.left >= r.bottom - r.top {
+                if r.top + r.bottom > screen.top + screen.bottom {
+                    BOTTOM
+                } else {
+                    TOP
+                }
+            } else if r.left + r.right > screen.left + screen.right {
+                RIGHT
+            } else {
+                LEFT
+            };
+            let reserved = match edge {
+                LEFT => work.left > screen.left,
+                TOP => work.top > screen.top,
+                RIGHT => work.right < screen.right,
+                _ => work.bottom < screen.bottom,
+            };
+            if !reserved {
+                edges |= edge;
+            }
         }
     }
     edges
 }
 
-fn monitor_rect(monitor: HMONITOR) -> Option<RECT> {
+/// Re-runs WM_NCCALCSIZE once Explorer has had time to move its taskbars
+/// after a setting or display change.
+fn reframe_later(raw: isize) {
+    std::thread::spawn(move || {
+        std::thread::sleep(SETTLE_DELAY);
+        let hwnd = HWND(raw as _);
+        if is_maximized(hwnd) {
+            reframe(hwnd);
+        }
+    });
+}
+
+fn reframe(hwnd: HWND) {
+    let _ = unsafe {
+        SetWindowPos(
+            hwnd,
+            None,
+            0,
+            0,
+            0,
+            0,
+            SWP_FRAMECHANGED
+                | SWP_NOMOVE
+                | SWP_NOSIZE
+                | SWP_NOZORDER
+                | SWP_NOOWNERZORDER
+                | SWP_NOACTIVATE
+                | SWP_ASYNCWINDOWPOS,
+        )
+    };
+}
+
+fn monitor_info(monitor: HMONITOR) -> Option<MONITORINFO> {
     let mut info = MONITORINFO {
         cbSize: std::mem::size_of::<MONITORINFO>() as u32,
         ..Default::default()
     };
     unsafe { GetMonitorInfoW(monitor, &mut info) }
         .as_bool()
-        .then_some(info.rcMonitor)
+        .then_some(info)
 }
 
 fn is_maximized(hwnd: HWND) -> bool {
@@ -181,27 +192,4 @@ fn is_maximized(hwnd: HWND) -> bool {
     };
     unsafe { GetWindowPlacement(hwnd, &mut placement) }.is_ok()
         && placement.showCmd == SW_MAXIMIZE.0 as u32
-}
-
-fn lock_cache() -> std::sync::MutexGuard<'static, Vec<(isize, u8)>> {
-    AUTOHIDE_EDGES.lock().unwrap_or_else(PoisonError::into_inner)
-}
-
-fn cached_edges(monitor: isize) -> Option<u8> {
-    lock_cache()
-        .iter()
-        .find(|(m, _)| *m == monitor)
-        .map(|(_, edges)| *edges)
-}
-
-/// Stores the edges for a monitor and returns what was stored before.
-fn remember_edges(monitor: isize, edges: u8) -> Option<u8> {
-    let mut cache = lock_cache();
-    match cache.iter_mut().find(|(m, _)| *m == monitor) {
-        Some(entry) => Some(std::mem::replace(&mut entry.1, edges)),
-        None => {
-            cache.push((monitor, edges));
-            None
-        }
-    }
 }
