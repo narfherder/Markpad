@@ -13,6 +13,7 @@
 		EDITOR_FONT_SIZE_RANGE,
 		EDITOR_MAX_WIDTH_RANGE,
 		PREVIEW_FONT_SIZE_RANGE,
+		TAB_SCROLL_SPEED_RANGE,
 		type NumericSettingRange,
 		type OSType,
 	} from '../stores/settings.svelte.js';
@@ -95,6 +96,7 @@
 	const setEditorMaxWidth = (value: number) => { settings.editorMaxWidth = clampToRange(value, EDITOR_MAX_WIDTH_RANGE); };
 	const setPreviewFontSize = (value: number) => { settings.previewFontSize = clampToRange(value, PREVIEW_FONT_SIZE_RANGE); };
 	const setCodeFontSize = (value: number) => { settings.codeFontSize = clampToRange(value, CODE_FONT_SIZE_RANGE); };
+	const setTabScrollSpeed = (value: number) => { settings.tabScrollSpeed = clampToRange(value, TAB_SCROLL_SPEED_RANGE); };
 	const highlightColors = [
 		{ value: 'default', color: 'var(--color-accent-fg)' },
 		{ value: 'yellow', color: '#ffd000' },
@@ -187,6 +189,7 @@
 		previewFontSize: settings.previewFontSize !== PREVIEW_FONT_SIZE_RANGE.default,
 		codeFont: settings.codeFont !== defaultFonts.codeFont,
 		codeFontSize: settings.codeFontSize !== CODE_FONT_SIZE_RANGE.default,
+		tabScrollSpeed: settings.tabScrollSpeed !== TAB_SCROLL_SPEED_RANGE.default,
 	});
 	let editorSettingsModified = $derived(
 		modified.editorFont || modified.editorFontSize || modified.editorMaxWidth,
@@ -1310,6 +1313,36 @@
 									<input id="appearance-tabs" type="checkbox" checked={settings.showTabs} onchange={() => settings.toggleTabs()} />
 									<span class="toggle-slider"></span>
 								</label>
+							</div>
+
+							<div class="setting-item" class:modified={modified.tabScrollSpeed}>
+								<label for="tab-scroll-speed">{t('settings.tabScrollSpeed', settings.language)}</label>
+								<div class="slider-container">
+									<div class="number-input-wrapper horizontal">
+										<button class="spin-btn minus" onclick={() => stepSetting(settings.tabScrollSpeed, -TAB_SCROLL_SPEED_RANGE.step, TAB_SCROLL_SPEED_RANGE, setTabScrollSpeed)} aria-label={t('common.decrease', settings.language)}>
+											<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+												><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+										</button>
+										<input
+											type="number"
+											id="tab-scroll-speed"
+											min={TAB_SCROLL_SPEED_RANGE.min}
+											max={TAB_SCROLL_SPEED_RANGE.max}
+											step={TAB_SCROLL_SPEED_RANGE.step}
+											value={settings.tabScrollSpeed}
+											oninput={(e) => handleNumberInput(e, TAB_SCROLL_SPEED_RANGE, setTabScrollSpeed)}
+											onchange={(e) => commitNumberInput(e, TAB_SCROLL_SPEED_RANGE, setTabScrollSpeed)}
+											onblur={(e) => commitNumberInput(e, TAB_SCROLL_SPEED_RANGE, setTabScrollSpeed)}
+											onkeydown={(e) => handleNumberKeydown(e, TAB_SCROLL_SPEED_RANGE, setTabScrollSpeed)}
+											class="number-input"
+										/>
+										<button class="spin-btn plus" onclick={() => stepSetting(settings.tabScrollSpeed, TAB_SCROLL_SPEED_RANGE.step, TAB_SCROLL_SPEED_RANGE, setTabScrollSpeed)} aria-label={t('common.increase', settings.language)}>
+											<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+												><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+										</button>
+									</div>
+									<span class="unit-label">%</span>
+								</div>
 							</div>
 
 							<div class="setting-item">

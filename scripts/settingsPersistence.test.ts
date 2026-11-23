@@ -360,7 +360,7 @@ test('values outside the shared range are still clamped on load', () => {
 });
 
 test('the settings UI renders its bounds from the shared range constants', () => {
-	for (const range of ['EDITOR_FONT_SIZE_RANGE', 'PREVIEW_FONT_SIZE_RANGE', 'CODE_FONT_SIZE_RANGE', 'EDITOR_MAX_WIDTH_RANGE']) {
+	for (const range of ['EDITOR_FONT_SIZE_RANGE', 'PREVIEW_FONT_SIZE_RANGE', 'CODE_FONT_SIZE_RANGE', 'EDITOR_MAX_WIDTH_RANGE', 'TAB_SCROLL_SPEED_RANGE']) {
 		assert.match(componentSource, new RegExp(`min=\\{${range}\\.min\\}`), `${range} min not wired to the UI`);
 		assert.match(componentSource, new RegExp(`max=\\{${range}\\.max\\}`), `${range} max not wired to the UI`);
 	}
@@ -406,7 +406,7 @@ test('spin buttons clamp with the same rules as typing', () => {
 });
 
 test('numeric setting inputs are one-way bound and commit through the clamp', () => {
-	const numericInputIds = ['editor-font-size', 'editor-max-width', 'preview-font-size', 'code-font-size'];
+	const numericInputIds = ['editor-font-size', 'editor-max-width', 'preview-font-size', 'code-font-size', 'tab-scroll-speed'];
 	for (const id of numericInputIds) {
 		const input = sliceBetween(componentSource, `id="${id}"`, '/>');
 		assert.doesNotMatch(input, /bind:value/, `${id} still uses a two-way number binding`);

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { type Tab as TabData, tabManager } from '../stores/tabs.svelte.js';
 	import Tab from './Tab.svelte';
+	import AllTabsMenu from './AllTabsMenu.svelte';
 	import ContextMenu, { type ContextMenuItem } from './ContextMenu.svelte';
 	import { t } from '../utils/i18n.js';
 	import { wheelDeltaToPixels } from '../utils/wheelScroll.js';
@@ -32,12 +33,14 @@
 	// Instant, not animated. Each notch starting its own smooth scroll made a
 	// fast spin stutter: every notch interrupted the animation before it, so the
 	// strip lurched between partial glides instead of tracking the wheel. Moving
-	// the exact distance immediately is what makes it feel attached to the hand.
+	// the distance immediately is what makes it feel attached to the hand; the
+	// Tab Scroll Speed setting scales that distance.
 	function handleTabWheel(e: WheelEvent & { currentTarget: HTMLElement }) {
 		if (e.deltaY === 0) return;
 		e.preventDefault();
 		const el = e.currentTarget;
-		el.scrollBy({ left: wheelDeltaToPixels(e.deltaY, e.deltaMode, el.clientWidth), behavior: 'instant' });
+		const distance = wheelDeltaToPixels(e.deltaY, e.deltaMode, el.clientWidth) * (settings.tabScrollSpeed / 100);
+		el.scrollBy({ left: distance, behavior: 'instant' });
 	}
 
 	// Drag state
@@ -236,6 +239,8 @@
 	</button>
 
 	<div class="tab-list-spacer" data-tauri-drag-region></div>
+
+	<AllTabsMenu {showHome} {ontabclick} {oncloseTab} />
 </div>
 
 <style>

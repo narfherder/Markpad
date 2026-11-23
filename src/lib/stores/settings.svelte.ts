@@ -174,6 +174,10 @@ export const PREVIEW_FONT_SIZE_RANGE: NumericSettingRange = { min: 12, max: 48, 
 export const CODE_FONT_SIZE_RANGE: NumericSettingRange = { min: 10, max: 48, step: 1, default: 14 };
 export const EDITOR_MAX_WIDTH_RANGE: NumericSettingRange = { min: 20, max: 500, step: 10, default: 80 };
 export const TOC_WIDTH_RANGE: NumericSettingRange = { min: 180, max: 420, step: 1, default: 240 };
+// Percent of the wheel's own distance. 100 is what the strip did before this
+// setting existed; the default is faster because that crossed a long strip of
+// tabs too slowly.
+export const TAB_SCROLL_SPEED_RANGE: NumericSettingRange = { min: 50, max: 500, step: 25, default: 200 };
 
 /** True when `value` is a finite number the user is allowed to commit as-is. */
 export function isWithinRange(value: unknown, range: NumericSettingRange): boolean {
@@ -337,6 +341,7 @@ export class SettingsStore {
 	renderLineHighlight = $state('line');
 	highlightColor = $state('yellow');
 	showTabs = $state(true);
+	tabScrollSpeed = $state(TAB_SCROLL_SPEED_RANGE.default);
 	restoreStateOnReopen = $state(true);
 	zenMode = $state(false);
 	showToc = $state(false);
@@ -684,6 +689,7 @@ export function createSettingsPersistence(): PersistedSetting<SettingsStore>[] {
 		booleanSetting('editor.wordCount', (s) => s.wordCount, (s, v) => { s.wordCount = v; }),
 		stringSetting('editor.renderLineHighlight', (s) => s.renderLineHighlight, (s, v) => { s.renderLineHighlight = v; }),
 		booleanSetting('editor.showTabs', (s) => s.showTabs, (s, v) => { s.showTabs = v; }),
+		numberSetting('editor.tabScrollSpeed', TAB_SCROLL_SPEED_RANGE, (s) => s.tabScrollSpeed, (s, v) => { s.tabScrollSpeed = v; }),
 		booleanSetting('editor.restoreStateOnReopen', (s) => s.restoreStateOnReopen, (s, v) => { s.restoreStateOnReopen = v; }),
 		booleanSetting('editor.zenMode', (s) => s.zenMode, (s, v) => { s.zenMode = v; }),
 		booleanSetting('editor.occurrencesHighlight', (s) => s.occurrencesHighlight, (s, v) => { s.occurrencesHighlight = v; }),

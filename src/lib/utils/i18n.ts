@@ -98,6 +98,7 @@ export const translations: Record<LanguageCode, Translation> = {
             occurrencesHighlight: 'Highlight Occurrences',
             showWhitespace: 'Show Whitespace',
             showTabs: 'Show Tabs',
+            tabScrollSpeed: 'Tab Scroll Speed',
             restoreStateOnReopen: 'Restore State on Reopen',
             openFileMode: 'Open existing files in',
             newFileDefaultMode: 'New file opens in editor',
@@ -376,6 +377,7 @@ export const translations: Record<LanguageCode, Translation> = {
             showTableOfContents: 'Show Table of Contents',
             hideTableOfContents: 'Hide Table of Contents',
             newTab: 'New Tab',
+            listAllTabs: 'List All Tabs',
             close: 'Close',
             find: 'Find'
         },
@@ -394,7 +396,9 @@ export const translations: Record<LanguageCode, Translation> = {
         },
         tabs: {
             untitled: 'Untitled',
-            home: 'Home'
+            home: 'Home',
+            searchTabs: 'Search tabs',
+            noMatchingTabs: 'No matching tabs'
         },
         common: {
             close: 'Close',
